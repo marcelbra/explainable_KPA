@@ -1,2 +1,2 @@
-# explainable_KPA
-Repository for exaplainable quantitative key-point-analysis
+# Explainable Key-Point Analysis
+Repository for exaplainable quantitative key-point-analysis practical course at Technical University of Munich.
