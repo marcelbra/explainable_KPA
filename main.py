@@ -1,8 +1,14 @@
-pd.set_option("display.max_colwidth", None)
+"""
+Current main workspace for explainable AI practical
+
+By:
+Marcel Braasch
+Saransh Agarwal
+Pınar Ayaz
+"""
 
 from copy import copy
 from collections import defaultdict
-
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, AutoModelForSequenceClassification
 from tqdm import tqdm_notebook
 import pandas as pd
@@ -70,8 +76,8 @@ def compute_entailment_preprocessed(tokenized_input_seq_pair):
 def load_data():
     data = pd.read_csv("../../argmining-21-keypoint-analysis-sharedtask-code/data/arg-kp/ArgKP_dataset.csv")
 
-    mapping = defaultdict(list)
     j = 0
+    mapping = defaultdict(list)
     for row in data.iterrows():
         if j == 15: break
         sample = row[1]
@@ -84,62 +90,44 @@ def load_data():
     args = []
     kps = []
     dropped = []
-    entailment_scores = []
+    scores = []
 
-    # Compute reference rankings without dropping a word
-    reference_rankings = defaultdict(list)
     for argument, key_points in tqdm_notebook(mapping.items()):
-
-        reference_scores = [compute_entailment(argument, key_point)["entail"] for key_point in key_points]
-        #"This is a test sentence" -> "This i#s a test"
         for key_point in key_points:
 
             tokenized_input_seq_pair = tokenizer.encode_plus(argument, key_point, max_length=MAX_LENGTH,
-                                                                 return_token_type_ids=True, truncation=True)
+                                                             return_token_type_ids=True, truncation=True)
             tokens = tokenized_input_seq_pair[0].tokens
             argument_tokens = tokens[:tokens.index("</s>")+1]
             key_point_tokens = tokens[tokens.index("</s>")+1:]
-            masking_groups = []
-            skip_words = ["<s>", "</s>", '`', ".", ","]
-            i = 0
             current_argument = copy(argument_tokens)
+            skip_words = ["<s>", "</s>", '`', ".", ","]
 
-            # For each dropped word
+            i = 0
             for i in range(len(argument_tokens)):
-                current_argument = copy(argument_tokens)
                 curr_drop = []
+                current_argument = copy(argument_tokens)
                 current_token = current_argument[i]
                 if current_token not in skip_words:
                     curr_drop.append(current_argument[i])
-                    current_argument[i] = "50264"  # <mask>
+                    current_argument[i] = "50264"  # <mask> token
                     while ((i+1) < len(tokens)
-                           and not tokens[i+1].startswith('Ġ')
+                           and not tokens[i+1].startswith('Ġ')  # marks new word
                            and tokens[i+1] not in skip_words):
                         i += 1
                         curr_drop.append(current_argument[i])
                         current_argument[i] = "50264"
 
-                new_sequence = current_argument + key_point_tokens
-                score = compute_entailment_preprocessed(new_sequence)["entail"]
-
                 dropped.append(curr_drop)
                 args.append(argument)
                 kps.append(key_point)
-                entailment_scores.append(score)
+                scores.append(compute_entailment_preprocessed(current_argument+key_point_tokens)["entail"])
 
     new_data["arg"] = args
     new_data["kp"] = kps
     new_data["dropped"] = dropped
-    new_data["score"] = entailment_scores
-    new_data.to_csv("/home/marcelbraasch/PycharmProjects/argmining-21-keypoint-analysis-sharedtask-code/paraphrasing/calculations.csv", index=False)
-
-"""
-s1 = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "Assisted suicide reduces suffering")
-s2 = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "Assisted suicide gives dignity to the person that wants to commit it")
-s3 = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "The terminally ill would benefit from assisted suicide")
-random = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "People should have the freedom to choose to end their life")
-s = 0
-"""
+    new_data["score"] = scores
+    new_data.to_csv("/home/marcelbraasch/PycharmProjects/explainable_KPA/calculations.csv", index=False)
 
 def unique(seq):
     """Order preserving unique function."""
@@ -157,3 +145,11 @@ def kendalls_tau():
             df_arg_dropped = df_arg.loc[df_arg.loc[:,'dropped']==word,:]
             df_arg_dropped = df_arg_dropped.drop_duplicates()
             s = 0
+
+"""
+s1 = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "Assisted suicide reduces suffering")
+s2 = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "Assisted suicide gives dignity to the person that wants to commit it")
+s3 = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "The terminally ill would benefit from assisted suicide")
+random = compute_entailment("a person has the right to end their suffering and if somebody takes pity on them and chooses to help, that person should not be punished.", "People should have the freedom to choose to end their life")
+s = 0
+"""
